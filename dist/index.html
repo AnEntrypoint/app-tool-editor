@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tool Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .header {
+      background: #2a2a2a;
+      padding: 12px 16px;
+      border-bottom: 1px solid #3a3a3a;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .title { font-weight: bold; color: #4ade80; font-size: 16px; }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+    }
+    .toolbar button {
+      background: #3a3a3a;
+      border: none;
+      color: #e0e0e0;
+      padding: 6px 14px;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .toolbar button:hover { background: #4a4a4a; }
+    .toolbar button.primary {
+      background: #4ade80;
+      color: #1a1a1a;
+    }
+    .toolbar button.primary:hover { background: #22c55e; }
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+    .sidebar {
+      width: 260px;
+      background: #242424;
+      border-right: 1px solid #3a3a3a;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    .sidebar h3 {
+      color: #4ade80;
+      margin-bottom: 12px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .tool-list {
+      list-style: none;
+    }
+    .tool-item {
+      background: #2a2a2a;
+      padding: 10px 12px;
+      margin: 6px 0;
+      border-radius: 6px;
+      cursor: pointer;
+      border-left: 3px solid transparent;
+    }
+    .tool-item:hover {
+      background: #333;
+      border-left-color: #4ade80;
+    }
+    .tool-item.active {
+      background: #3a3a3a;
+      border-left-color: #4ade80;
+    }
+    .tool-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .tool-desc { font-size: 11px; color: #999; }
+    .editor-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .tabs {
+      display: flex;
+      background: #252525;
+      border-bottom: 1px solid #3a3a3a;
+      padding: 0 12px;
+    }
+    .tab {
+      padding: 10px 16px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      font-size: 13px;
+    }
+    .tab:hover { background: #2a2a2a; }
+    .tab.active {
+      border-bottom-color: #4ade80;
+      color: #4ade80;
+    }
+    .content {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 13px;
+      color: #ccc;
+      font-weight: 600;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #e0e0e0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .form-group textarea {
+      font-family: 'Courier New', monospace;
+      min-height: 120px;
+      resize: vertical;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none;
+      border-color: #4ade80;
+    }
+    .param-list {
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 16px;
+    }
+    .param-item {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+    .param-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .param-header h4 {
+      color: #4ade80;
+      font-size: 14px;
+    }
+    .param-header button {
+      background: #ff5f56;
+      border: none;
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .param-field {
+      margin-bottom: 12px;
+    }
+    .param-field label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 12px;
+      color: #999;
+    }
+    .param-field input, .param-field select {
+      width: 100%;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      color: #e0e0e0;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    .add-param-btn {
+      background: #4ade80;
+      border: none;
+      color: #1a1a1a;
+      padding: 10px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      width: 100%;
+    }
+    .add-param-btn:hover { background: #22c55e; }
+    .test-panel {
+      background: #242424;
+      border-top: 1px solid #3a3a3a;
+      padding: 20px;
+    }
+    .test-panel h3 {
+      color: #4ade80;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .test-result {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 6px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .test-result.success { border-color: #4ade80; color: #4ade80; }
+    .test-result.error { border-color: #ff5f56; color: #ff5f56; }
+    .schema-preview {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 16px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      overflow-x: auto;
+    }
+    .code-block {
+      background: #1e1e1e;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 16px;
+      margin-top: 12px;
+    }
+    .code-block pre {
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #e0e0e0;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">🔧 Tool Editor</div>
+    <div class="toolbar">
+      <button onclick="newTool()">New Tool</button>
+      <button onclick="saveTool()" class="primary">Save</button>
+      <button onclick="exportTool()">Export</button>
+      <button onclick="generateDocs()">Generate Docs</button>
+    </div>
+  </div>
+  <div class="main">
+    <div class="sidebar">
+      <h3>Tools</h3>
+      <ul class="tool-list">
+        <li class="tool-item active" onclick="selectTool('database')">
+          <div class="tool-name">database</div>
+          <div class="tool-desc">Database operations</div>
+        </li>
+        <li class="tool-item" onclick="selectTool('api')">
+          <div class="tool-name">api</div>
+          <div class="tool-desc">HTTP API client</div>
+        </li>
+        <li class="tool-item" onclick="selectTool('file')">
+          <div class="tool-name">file</div>
+          <div class="tool-desc">File system operations</div>
+        </li>
+      </ul>
+    </div>
+    <div class="editor-container">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('definition')">Definition</div>
+        <div class="tab" onclick="switchTab('imports')">Imports</div>
+        <div class="tab" onclick="switchTab('parameters')">Parameters</div>
+        <div class="tab" onclick="switchTab('test')">Test</div>
+        <div class="tab" onclick="switchTab('schema')">Schema</div>
+      </div>
+      <div class="content" id="definitionTab">
+        <div class="form-group">
+          <label>Tool Name</label>
+          <input type="text" id="toolName" value="database" />
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="toolDesc">Provides database operations like query, insert, update, delete</textarea>
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="toolCategory">
+            <option value="data">Data</option>
+            <option value="api">API</option>
+            <option value="file">File System</option>
+            <option value="util">Utility</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Implementation</label>
+          <textarea id="toolImpl" style="min-height: 200px;">async function executeTool(params) {
+  const { operation, query, data } = params;
+
+  switch(operation) {
+    case 'query':
+      return await db.query(query);
+    case 'insert':
+      return await db.insert(data);
+    case 'update':
+      return await db.update(data);
+    case 'delete':
+      return await db.delete(query);
+    default:
+      throw new Error('Unknown operation');
+  }
+}</textarea>
+        </div>
+      </div>
+      <div class="content" id="importsTab" style="display: none;">
+        <h3 style="color: #4ade80; margin-bottom: 16px;">Imports & Dependencies</h3>
+
+        <div class="form-group">
+          <label>NPM Packages</label>
+          <p style="font-size: 12px; color: #999; margin-bottom: 8px;">Comma-separated list of npm packages (e.g., axios, lodash, moment)</p>
+          <textarea id="npmPackages" style="min-height: 80px;" placeholder="axios, lodash, moment"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>CDN URLs</label>
+          <p style="font-size: 12px; color: #999; margin-bottom: 8px;">External library URLs (one per line)</p>
+          <textarea id="cdnUrls" style="min-height: 100px;" placeholder="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js
+https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></textarea>
+        </div>
+
+        <div class="form-group">
+          <label>ES Module Imports</label>
+          <p style="font-size: 12px; color: #999; margin-bottom: 8px;">Import statements for your tool implementation</p>
+          <textarea id="esImports" style="min-height: 120px;">import axios from 'axios';
+import { debounce } from 'lodash';
+import moment from 'moment';</textarea>
+        </div>
+
+        <div class="form-group">
+          <label>Import Map (Advanced)</label>
+          <p style="font-size: 12px; color: #999; margin-bottom: 8px;">Custom import map for module resolution</p>
+          <textarea id="importMap" style="min-height: 150px;">{
+  "imports": {
+    "axios": "https://cdn.jsdelivr.net/npm/axios@1.6.0/+esm",
+    "lodash": "https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm"
+  }
+}</textarea>
+        </div>
+
+        <div class="code-block">
+          <h4 style="color: #4ade80; margin-bottom: 12px;">Generated Import Configuration</h4>
+          <pre id="importPreview">{
+  "npm": ["axios", "lodash", "moment"],
+  "cdn": ["https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"],
+  "imports": "import axios from 'axios';\nimport { debounce } from 'lodash';",
+  "importMap": { ... }
+}</pre>
+        </div>
+      </div>
+      <div class="content" id="parametersTab" style="display: none;">
+        <h3 style="color: #4ade80; margin-bottom: 16px;">Parameters</h3>
+        <div class="param-list" id="paramList">
+          <div class="param-item">
+            <div class="param-header">
+              <h4>operation</h4>
+              <button onclick="this.closest('.param-item').remove()">Remove</button>
+            </div>
+            <div class="param-field">
+              <label>Type</label>
+              <select>
+                <option selected>string</option>
+                <option>number</option>
+                <option>boolean</option>
+                <option>object</option>
+                <option>array</option>
+              </select>
+            </div>
+            <div class="param-field">
+              <label>Description</label>
+              <input type="text" value="Database operation: query, insert, update, delete" />
+            </div>
+            <div class="param-field">
+              <label>Required</label>
+              <select>
+                <option selected>Yes</option>
+                <option>No</option>
+              </select>
+            </div>
+            <div class="param-field">
+              <label>Default Value</label>
+              <input type="text" placeholder="Leave empty for none" />
+            </div>
+          </div>
+          <div class="param-item">
+            <div class="param-header">
+              <h4>query</h4>
+              <button onclick="this.closest('.param-item').remove()">Remove</button>
+            </div>
+            <div class="param-field">
+              <label>Type</label>
+              <select>
+                <option selected>string</option>
+                <option>number</option>
+                <option>boolean</option>
+                <option>object</option>
+                <option>array</option>
+              </select>
+            </div>
+            <div class="param-field">
+              <label>Description</label>
+              <input type="text" value="SQL query or filter conditions" />
+            </div>
+            <div class="param-field">
+              <label>Required</label>
+              <select>
+                <option>Yes</option>
+                <option selected>No</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <button class="add-param-btn" onclick="addParameter()">+ Add Parameter</button>
+      </div>
+      <div class="content" id="testTab" style="display: none;">
+        <div class="test-panel">
+          <h3>Test Input</h3>
+          <div class="form-group">
+            <label>Parameters (JSON)</label>
+            <textarea id="testInput" style="min-height: 150px;">{
+  "operation": "query",
+  "query": "SELECT * FROM users WHERE id = 1"
+}</textarea>
+          </div>
+          <button class="primary" style="width: 100%; padding: 12px;" onclick="runTest()">▶ Run Test</button>
+          <h3 style="margin-top: 24px;">Test Result</h3>
+          <div class="test-result" id="testResult">
+            Click "Run Test" to execute the tool with test input
+          </div>
+        </div>
+      </div>
+      <div class="content" id="schemaTab" style="display: none;">
+        <h3 style="color: #4ade80; margin-bottom: 16px;">JSON Schema</h3>
+        <p style="color: #999; margin-bottom: 16px; font-size: 13px;">
+          Auto-generated schema based on your parameter definitions
+        </p>
+        <div class="schema-preview">
+<pre>{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "operation": {
+      "type": "string",
+      "description": "Database operation: query, insert, update, delete",
+      "enum": ["query", "insert", "update", "delete"]
+    },
+    "query": {
+      "type": "string",
+      "description": "SQL query or filter conditions"
+    },
+    "data": {
+      "type": "object",
+      "description": "Data for insert/update operations"
+    }
+  },
+  "required": ["operation"]
+}</pre>
+        </div>
+        <h3 style="color: #4ade80; margin: 24px 0 16px;">Usage Example</h3>
+        <div class="code-block">
+<pre>// Call the tool in your task
+const result = await __callHostTool__('database', {
+  operation: 'query',
+  query: 'SELECT * FROM users'
+});
+
+console.log('Query result:', result);</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentTool = {
+      name: 'database',
+      description: 'Provides database operations',
+      category: 'data',
+      implementation: 'async function executeTool(params) {...}',
+      parameters: [
+        { name: 'operation', type: 'string', description: 'Operation type', required: true },
+        { name: 'query', type: 'string', description: 'SQL query', required: false }
+      ]
+    };
+
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.getElementById('definitionTab').style.display = tab === 'definition' ? 'block' : 'none';
+      document.getElementById('parametersTab').style.display = tab === 'parameters' ? 'block' : 'none';
+      document.getElementById('testTab').style.display = tab === 'test' ? 'block' : 'none';
+      document.getElementById('schemaTab').style.display = tab === 'schema' ? 'block' : 'none';
+    }
+
+    function selectTool(name) {
+      document.querySelectorAll('.tool-item').forEach(t => t.classList.remove('active'));
+      event.target.closest('.tool-item').classList.add('active');
+
+      const tools = {
+        'database': {
+          name: 'database',
+          desc: 'Database operations',
+          impl: 'async function executeTool(params) { return await db.query(params.query); }'
+        },
+        'api': {
+          name: 'api',
+          desc: 'HTTP API client',
+          impl: 'async function executeTool(params) { return await fetch(params.url); }'
+        },
+        'file': {
+          name: 'file',
+          desc: 'File system operations',
+          impl: 'async function executeTool(params) { return await fs.readFile(params.path); }'
+        }
+      };
+
+      const tool = tools[name];
+      if (tool) {
+        document.getElementById('toolName').value = tool.name;
+        document.getElementById('toolDesc').value = tool.desc;
+        document.getElementById('toolImpl').value = tool.impl;
+      }
+    }
+
+    function addParameter() {
+      const list = document.getElementById('paramList');
+      const item = document.createElement('div');
+      item.className = 'param-item';
+      item.innerHTML = `
+        <div class="param-header">
+          <h4>newParam</h4>
+          <button onclick="this.closest('.param-item').remove()">Remove</button>
+        </div>
+        <div class="param-field">
+          <label>Type</label>
+          <select>
+            <option selected>string</option>
+            <option>number</option>
+            <option>boolean</option>
+            <option>object</option>
+            <option>array</option>
+          </select>
+        </div>
+        <div class="param-field">
+          <label>Description</label>
+          <input type="text" placeholder="Parameter description" />
+        </div>
+        <div class="param-field">
+          <label>Required</label>
+          <select>
+            <option selected>Yes</option>
+            <option>No</option>
+          </select>
+        </div>
+      `;
+      list.appendChild(item);
+    }
+
+    function runTest() {
+      const result = document.getElementById('testResult');
+      result.className = 'test-result';
+      result.textContent = 'Executing tool...';
+
+      setTimeout(() => {
+        try {
+          const input = JSON.parse(document.getElementById('testInput').value);
+          result.className = 'test-result success';
+          result.innerHTML = `✓ Success\n\nResult: {\n  "success": true,\n  "rows": [\n    { "id": 1, "name": "John Doe" }\n  ],\n  "count": 1\n}`;
+        } catch (error) {
+          result.className = 'test-result error';
+          result.textContent = `✗ Error: ${error.message}`;
+        }
+      }, 1000);
+    }
+
+    function saveTool() {
+      currentTool.name = document.getElementById('toolName').value;
+      currentTool.description = document.getElementById('toolDesc').value;
+      currentTool.implementation = document.getElementById('toolImpl').value;
+      alert('Tool saved: ' + currentTool.name);
+    }
+
+    function exportTool() {
+      const json = JSON.stringify(currentTool, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTool.name}-tool.json`;
+      a.click();
+    }
+
+    function generateDocs() {
+      const docs = `# ${currentTool.name} Tool\n\n${currentTool.description}\n\n## Parameters\n\n- operation (string, required): Operation type\n- query (string, optional): SQL query\n\n## Usage\n\n\`\`\`javascript\nconst result = await __callHostTool__('${currentTool.name}', { operation: 'query' });\n\`\`\``;
+
+      const blob = new Blob([docs], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${currentTool.name}-README.md`;
+      a.click();
+    }
+
+    function newTool() {
+      document.getElementById('toolName').value = 'new-tool';
+      document.getElementById('toolDesc').value = 'Description of your new tool';
+      document.getElementById('toolImpl').value = 'async function executeTool(params) {\n  // Implementation\n  return { success: true };\n}';
+    }
+  </script>
+</body>
+</html>
