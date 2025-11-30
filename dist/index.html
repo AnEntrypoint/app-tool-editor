@@ -44,6 +44,11 @@
       color: #1a1a1a;
     }
     .toolbar button.primary:hover { background: #22c55e; }
+    .toolbar button:disabled {
+      background: #2a2a2a;
+      color: #666;
+      cursor: not-allowed;
+    }
     .main {
       display: flex;
       flex: 1;
@@ -247,6 +252,35 @@
       color: #e0e0e0;
       overflow-x: auto;
     }
+    .notification {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #2a2a2a;
+      border: 1px solid #3a3a3a;
+      border-radius: 8px;
+      padding: 16px 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 1000;
+      max-width: 400px;
+      animation: slideIn 0.3s ease;
+    }
+    .notification.success { border-left: 4px solid #4ade80; }
+    .notification.error { border-left: 4px solid #ff5f56; }
+    .notification.info { border-left: 4px solid #4a9eff; }
+    @keyframes slideIn {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: #666;
+    }
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
   </style>
 </head>
 <body>
@@ -254,7 +288,8 @@
     <div class="title">🔧 Tool Editor</div>
     <div class="toolbar">
       <button onclick="newTool()">New Tool</button>
-      <button onclick="saveTool()" class="primary">Save</button>
+      <button onclick="saveTool()" class="primary" id="saveBtn">Save</button>
+      <button onclick="deleteTool()" id="deleteBtn">Delete</button>
       <button onclick="exportTool()">Export</button>
       <button onclick="generateDocs()">Generate Docs</button>
     </div>
@@ -262,19 +297,11 @@
   <div class="main">
     <div class="sidebar">
       <h3>Tools</h3>
-      <ul class="tool-list">
-        <li class="tool-item active" onclick="selectTool('database')">
-          <div class="tool-name">database</div>
-          <div class="tool-desc">Database operations</div>
-        </li>
-        <li class="tool-item" onclick="selectTool('api')">
-          <div class="tool-name">api</div>
-          <div class="tool-desc">HTTP API client</div>
-        </li>
-        <li class="tool-item" onclick="selectTool('file')">
-          <div class="tool-name">file</div>
-          <div class="tool-desc">File system operations</div>
-        </li>
+      <ul class="tool-list" id="toolList">
+        <div class="empty-state">
+          <div class="empty-state-icon">🔧</div>
+          <div>Loading tools...</div>
+        </div>
       </ul>
     </div>
     <div class="editor-container">
@@ -288,11 +315,11 @@
       <div class="content" id="definitionTab">
         <div class="form-group">
           <label>Tool Name</label>
-          <input type="text" id="toolName" value="database" />
+          <input type="text" id="toolName" placeholder="my-tool" />
         </div>
         <div class="form-group">
           <label>Description</label>
-          <textarea id="toolDesc">Provides database operations like query, insert, update, delete</textarea>
+          <textarea id="toolDesc" placeholder="Describe what this tool does"></textarea>
         </div>
         <div class="form-group">
           <label>Category</label>
@@ -306,22 +333,10 @@
         </div>
         <div class="form-group">
           <label>Implementation</label>
-          <textarea id="toolImpl" style="min-height: 200px;">async function executeTool(params) {
-  const { operation, query, data } = params;
-
-  switch(operation) {
-    case 'query':
-      return await db.query(query);
-    case 'insert':
-      return await db.insert(data);
-    case 'update':
-      return await db.update(data);
-    case 'delete':
-      return await db.delete(query);
-    default:
-      throw new Error('Unknown operation');
-  }
-}</textarea>
+          <textarea id="toolImpl" style="min-height: 200px;" placeholder="async function executeTool(params) {
+  // Tool implementation
+  return { success: true };
+}"></textarea>
         </div>
       </div>
       <div class="content" id="importsTab" style="display: none;">
@@ -343,93 +358,30 @@ https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></textarea>
         <div class="form-group">
           <label>ES Module Imports</label>
           <p style="font-size: 12px; color: #999; margin-bottom: 8px;">Import statements for your tool implementation</p>
-          <textarea id="esImports" style="min-height: 120px;">import axios from 'axios';
+          <textarea id="esImports" style="min-height: 120px;" placeholder="import axios from 'axios';
 import { debounce } from 'lodash';
-import moment from 'moment';</textarea>
+import moment from 'moment';"></textarea>
         </div>
 
         <div class="form-group">
           <label>Import Map (Advanced)</label>
           <p style="font-size: 12px; color: #999; margin-bottom: 8px;">Custom import map for module resolution</p>
-          <textarea id="importMap" style="min-height: 150px;">{
+          <textarea id="importMap" style="min-height: 150px;" placeholder='{
   "imports": {
     "axios": "https://cdn.jsdelivr.net/npm/axios@1.6.0/+esm",
     "lodash": "https://cdn.jsdelivr.net/npm/lodash@4.17.21/+esm"
   }
-}</textarea>
+}'></textarea>
         </div>
 
         <div class="code-block">
           <h4 style="color: #4ade80; margin-bottom: 12px;">Generated Import Configuration</h4>
-          <pre id="importPreview">{
-  "npm": ["axios", "lodash", "moment"],
-  "cdn": ["https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"],
-  "imports": "import axios from 'axios';\nimport { debounce } from 'lodash';",
-  "importMap": { ... }
-}</pre>
+          <pre id="importPreview">Configure imports above to see preview</pre>
         </div>
       </div>
       <div class="content" id="parametersTab" style="display: none;">
         <h3 style="color: #4ade80; margin-bottom: 16px;">Parameters</h3>
         <div class="param-list" id="paramList">
-          <div class="param-item">
-            <div class="param-header">
-              <h4>operation</h4>
-              <button onclick="this.closest('.param-item').remove()">Remove</button>
-            </div>
-            <div class="param-field">
-              <label>Type</label>
-              <select>
-                <option selected>string</option>
-                <option>number</option>
-                <option>boolean</option>
-                <option>object</option>
-                <option>array</option>
-              </select>
-            </div>
-            <div class="param-field">
-              <label>Description</label>
-              <input type="text" value="Database operation: query, insert, update, delete" />
-            </div>
-            <div class="param-field">
-              <label>Required</label>
-              <select>
-                <option selected>Yes</option>
-                <option>No</option>
-              </select>
-            </div>
-            <div class="param-field">
-              <label>Default Value</label>
-              <input type="text" placeholder="Leave empty for none" />
-            </div>
-          </div>
-          <div class="param-item">
-            <div class="param-header">
-              <h4>query</h4>
-              <button onclick="this.closest('.param-item').remove()">Remove</button>
-            </div>
-            <div class="param-field">
-              <label>Type</label>
-              <select>
-                <option selected>string</option>
-                <option>number</option>
-                <option>boolean</option>
-                <option>object</option>
-                <option>array</option>
-              </select>
-            </div>
-            <div class="param-field">
-              <label>Description</label>
-              <input type="text" value="SQL query or filter conditions" />
-            </div>
-            <div class="param-field">
-              <label>Required</label>
-              <select>
-                <option>Yes</option>
-                <option selected>No</option>
-              </select>
-            </div>
-          </div>
         </div>
         <button class="add-param-btn" onclick="addParameter()">+ Add Parameter</button>
       </div>
@@ -438,10 +390,10 @@ import moment from 'moment';</textarea>
           <h3>Test Input</h3>
           <div class="form-group">
             <label>Parameters (JSON)</label>
-            <textarea id="testInput" style="min-height: 150px;">{
+            <textarea id="testInput" style="min-height: 150px;" placeholder='{
   "operation": "query",
   "query": "SELECT * FROM users WHERE id = 1"
-}</textarea>
+}'></textarea>
           </div>
           <button class="primary" style="width: 100%; padding: 12px;" onclick="runTest()">▶ Run Test</button>
           <h3 style="margin-top: 24px;">Test Result</h3>
@@ -455,126 +407,446 @@ import moment from 'moment';</textarea>
         <p style="color: #999; margin-bottom: 16px; font-size: 13px;">
           Auto-generated schema based on your parameter definitions
         </p>
-        <div class="schema-preview">
-<pre>{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "operation": {
-      "type": "string",
-      "description": "Database operation: query, insert, update, delete",
-      "enum": ["query", "insert", "update", "delete"]
-    },
-    "query": {
-      "type": "string",
-      "description": "SQL query or filter conditions"
-    },
-    "data": {
-      "type": "object",
-      "description": "Data for insert/update operations"
-    }
-  },
-  "required": ["operation"]
-}</pre>
+        <div class="schema-preview" id="schemaPreview">
+          <pre>Define parameters to see schema</pre>
         </div>
         <h3 style="color: #4ade80; margin: 24px 0 16px;">Usage Example</h3>
         <div class="code-block">
-<pre>// Call the tool in your task
-const result = await __callHostTool__('database', {
-  operation: 'query',
-  query: 'SELECT * FROM users'
+          <pre id="usageExample">// Call the tool in your task
+const result = await __callHostTool__('my-tool', {
+  // parameters here
 });
 
-console.log('Query result:', result);</pre>
+console.log('Result:', result);</pre>
         </div>
       </div>
     </div>
   </div>
 
   <script>
-    let currentTool = {
-      name: 'database',
-      description: 'Provides database operations',
-      category: 'data',
-      implementation: 'async function executeTool(params) {...}',
-      parameters: [
-        { name: 'operation', type: 'string', description: 'Operation type', required: true },
-        { name: 'query', type: 'string', description: 'SQL query', required: false }
-      ]
-    };
+    let currentTool = null;
+    let tools = [];
+    let parameters = [];
+
+    function showNotification(message, type = 'info') {
+      const existing = document.querySelector('.notification');
+      if (existing) existing.remove();
+
+      const notification = document.createElement('div');
+      notification.className = `notification ${type}`;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+
+      setTimeout(() => {
+        notification.remove();
+      }, 3000);
+    }
+
+    async function loadTools() {
+      try {
+        const res = await fetch('/api/tools');
+        if (!res.ok) {
+          showNotification('Failed to load tools', 'error');
+          return;
+        }
+        tools = await res.json();
+        renderToolList();
+
+        if (tools.length > 0) {
+          selectToolById(tools[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load tools:', error);
+        showNotification('Error loading tools: ' + error.message, 'error');
+        renderEmptyState();
+      }
+    }
+
+    function renderToolList() {
+      const list = document.getElementById('toolList');
+      if (tools.length === 0) {
+        renderEmptyState();
+        return;
+      }
+
+      list.innerHTML = tools.map((tool, idx) => `
+        <li class="tool-item ${idx === 0 ? 'active' : ''}" onclick="selectToolById('${tool.id}')" data-tool-id="${tool.id}">
+          <div class="tool-name">${tool.name || tool.id}</div>
+          <div class="tool-desc">${tool.description || 'No description'}</div>
+        </li>
+      `).join('');
+    }
+
+    function renderEmptyState() {
+      const list = document.getElementById('toolList');
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">🔧</div>
+          <div>No tools yet</div>
+          <div style="font-size: 12px; margin-top: 8px;">Click "New Tool" to create one</div>
+        </div>
+      `;
+    }
+
+    function selectToolById(toolId) {
+      const tool = tools.find(t => t.id === toolId);
+      if (!tool) return;
+
+      currentTool = tool;
+
+      document.querySelectorAll('.tool-item').forEach(t => t.classList.remove('active'));
+      const item = document.querySelector(`[data-tool-id="${toolId}"]`);
+      if (item) item.classList.add('active');
+
+      document.getElementById('toolName').value = tool.name || '';
+      document.getElementById('toolDesc').value = tool.description || '';
+      document.getElementById('toolCategory').value = tool.category || 'custom';
+      document.getElementById('toolImpl').value = tool.implementation || '';
+      document.getElementById('npmPackages').value = (tool.imports?.npm || []).join(', ');
+      document.getElementById('cdnUrls').value = (tool.imports?.cdn || []).join('\n');
+      document.getElementById('esImports').value = tool.imports?.esModules || '';
+      document.getElementById('importMap').value = tool.imports?.importMap ? JSON.stringify(tool.imports.importMap, null, 2) : '';
+
+      parameters = tool.parameters || [];
+      renderParameters();
+      updateSchema();
+      updateImportPreview();
+    }
 
     function switchTab(tab) {
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       event.target.classList.add('active');
 
       document.getElementById('definitionTab').style.display = tab === 'definition' ? 'block' : 'none';
+      document.getElementById('importsTab').style.display = tab === 'imports' ? 'block' : 'none';
       document.getElementById('parametersTab').style.display = tab === 'parameters' ? 'block' : 'none';
       document.getElementById('testTab').style.display = tab === 'test' ? 'block' : 'none';
       document.getElementById('schemaTab').style.display = tab === 'schema' ? 'block' : 'none';
-    }
 
-    function selectTool(name) {
-      document.querySelectorAll('.tool-item').forEach(t => t.classList.remove('active'));
-      event.target.closest('.tool-item').classList.add('active');
-
-      const tools = {
-        'database': {
-          name: 'database',
-          desc: 'Database operations',
-          impl: 'async function executeTool(params) { return await db.query(params.query); }'
-        },
-        'api': {
-          name: 'api',
-          desc: 'HTTP API client',
-          impl: 'async function executeTool(params) { return await fetch(params.url); }'
-        },
-        'file': {
-          name: 'file',
-          desc: 'File system operations',
-          impl: 'async function executeTool(params) { return await fs.readFile(params.path); }'
-        }
-      };
-
-      const tool = tools[name];
-      if (tool) {
-        document.getElementById('toolName').value = tool.name;
-        document.getElementById('toolDesc').value = tool.desc;
-        document.getElementById('toolImpl').value = tool.impl;
+      if (tab === 'schema') {
+        updateSchema();
+      }
+      if (tab === 'imports') {
+        updateImportPreview();
       }
     }
 
-    function addParameter() {
+    function renderParameters() {
       const list = document.getElementById('paramList');
-      const item = document.createElement('div');
-      item.className = 'param-item';
-      item.innerHTML = `
-        <div class="param-header">
-          <h4>newParam</h4>
-          <button onclick="this.closest('.param-item').remove()">Remove</button>
+      if (parameters.length === 0) {
+        list.innerHTML = '<div style="color: #666; text-align: center; padding: 20px;">No parameters defined</div>';
+        return;
+      }
+
+      list.innerHTML = parameters.map((param, idx) => `
+        <div class="param-item">
+          <div class="param-header">
+            <h4>${param.name}</h4>
+            <button onclick="removeParameter(${idx})">Remove</button>
+          </div>
+          <div class="param-field">
+            <label>Name</label>
+            <input type="text" value="${param.name}" onchange="updateParameter(${idx}, 'name', this.value)" />
+          </div>
+          <div class="param-field">
+            <label>Type</label>
+            <select onchange="updateParameter(${idx}, 'type', this.value)">
+              <option ${param.type === 'string' ? 'selected' : ''}>string</option>
+              <option ${param.type === 'number' ? 'selected' : ''}>number</option>
+              <option ${param.type === 'boolean' ? 'selected' : ''}>boolean</option>
+              <option ${param.type === 'object' ? 'selected' : ''}>object</option>
+              <option ${param.type === 'array' ? 'selected' : ''}>array</option>
+            </select>
+          </div>
+          <div class="param-field">
+            <label>Description</label>
+            <input type="text" value="${param.description || ''}" onchange="updateParameter(${idx}, 'description', this.value)" />
+          </div>
+          <div class="param-field">
+            <label>Required</label>
+            <select onchange="updateParameter(${idx}, 'required', this.value === 'Yes')">
+              <option ${param.required ? 'selected' : ''}>Yes</option>
+              <option ${!param.required ? 'selected' : ''}>No</option>
+            </select>
+          </div>
+          <div class="param-field">
+            <label>Default Value</label>
+            <input type="text" value="${param.default || ''}" onchange="updateParameter(${idx}, 'default', this.value)" placeholder="Leave empty for none" />
+          </div>
         </div>
-        <div class="param-field">
-          <label>Type</label>
-          <select>
-            <option selected>string</option>
-            <option>number</option>
-            <option>boolean</option>
-            <option>object</option>
-            <option>array</option>
-          </select>
-        </div>
-        <div class="param-field">
-          <label>Description</label>
-          <input type="text" placeholder="Parameter description" />
-        </div>
-        <div class="param-field">
-          <label>Required</label>
-          <select>
-            <option selected>Yes</option>
-            <option>No</option>
-          </select>
-        </div>
-      `;
-      list.appendChild(item);
+      `).join('');
+    }
+
+    function addParameter() {
+      parameters.push({
+        name: 'newParam',
+        type: 'string',
+        description: '',
+        required: false,
+        default: ''
+      });
+      renderParameters();
+      updateSchema();
+    }
+
+    function removeParameter(idx) {
+      parameters.splice(idx, 1);
+      renderParameters();
+      updateSchema();
+    }
+
+    function updateParameter(idx, field, value) {
+      if (parameters[idx]) {
+        parameters[idx][field] = value;
+        updateSchema();
+      }
+    }
+
+    function updateSchema() {
+      const schema = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": {},
+        "required": []
+      };
+
+      parameters.forEach(param => {
+        schema.properties[param.name] = {
+          type: param.type,
+          description: param.description || ''
+        };
+        if (param.default) {
+          schema.properties[param.name].default = param.default;
+        }
+        if (param.required) {
+          schema.required.push(param.name);
+        }
+      });
+
+      document.getElementById('schemaPreview').innerHTML = `<pre>${JSON.stringify(schema, null, 2)}</pre>`;
+
+      const toolName = document.getElementById('toolName').value || 'my-tool';
+      const exampleParams = parameters.reduce((acc, param) => {
+        acc[param.name] = param.default || (param.type === 'string' ? 'value' : param.type === 'number' ? 0 : null);
+        return acc;
+      }, {});
+
+      document.getElementById('usageExample').textContent = `// Call the tool in your task
+const result = await __callHostTool__('${toolName}', ${JSON.stringify(exampleParams, null, 2)});
+
+console.log('Result:', result);`;
+    }
+
+    function updateImportPreview() {
+      const npmText = document.getElementById('npmPackages').value;
+      const cdnText = document.getElementById('cdnUrls').value;
+      const esImports = document.getElementById('esImports').value;
+      const importMapText = document.getElementById('importMap').value;
+
+      const config = {
+        npm: npmText ? npmText.split(',').map(s => s.trim()).filter(Boolean) : [],
+        cdn: cdnText ? cdnText.split('\n').map(s => s.trim()).filter(Boolean) : [],
+        esModules: esImports,
+        importMap: null
+      };
+
+      try {
+        if (importMapText) {
+          config.importMap = JSON.parse(importMapText);
+        }
+      } catch (e) {
+        console.error('Invalid import map JSON:', e);
+      }
+
+      document.getElementById('importPreview').textContent = JSON.stringify(config, null, 2);
+    }
+
+    async function saveTool() {
+      const name = document.getElementById('toolName').value.trim();
+      if (!name) {
+        showNotification('Tool name is required', 'error');
+        return;
+      }
+
+      const npmText = document.getElementById('npmPackages').value;
+      const cdnText = document.getElementById('cdnUrls').value;
+      const esImports = document.getElementById('esImports').value;
+      const importMapText = document.getElementById('importMap').value;
+
+      let importMap = null;
+      try {
+        if (importMapText) {
+          importMap = JSON.parse(importMapText);
+        }
+      } catch (e) {
+        showNotification('Invalid import map JSON', 'error');
+        return;
+      }
+
+      const definition = {
+        description: document.getElementById('toolDesc').value,
+        category: document.getElementById('toolCategory').value,
+        implementation: document.getElementById('toolImpl').value,
+        parameters: parameters,
+        imports: {
+          npm: npmText ? npmText.split(',').map(s => s.trim()).filter(Boolean) : [],
+          cdn: cdnText ? cdnText.split('\n').map(s => s.trim()).filter(Boolean) : [],
+          esModules: esImports,
+          importMap: importMap
+        }
+      };
+
+      try {
+        const res = await fetch('/api/tools', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, definition })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          showNotification('Failed to save: ' + (error.error || 'Unknown error'), 'error');
+          return;
+        }
+
+        const saved = await res.json();
+        showNotification('Tool saved successfully', 'success');
+
+        const existingIdx = tools.findIndex(t => t.id === saved.id);
+        if (existingIdx >= 0) {
+          tools[existingIdx] = saved;
+        } else {
+          tools.push(saved);
+        }
+
+        renderToolList();
+        selectToolById(saved.id);
+      } catch (error) {
+        console.error('Save error:', error);
+        showNotification('Error saving tool: ' + error.message, 'error');
+      }
+    }
+
+    async function deleteTool() {
+      const name = document.getElementById('toolName').value.trim();
+      if (!name) {
+        showNotification('No tool selected to delete', 'error');
+        return;
+      }
+
+      if (!confirm(`Delete tool "${name}"? This cannot be undone.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/tools/${name}`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' }
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          showNotification('Failed to delete: ' + (error.error || 'Unknown error'), 'error');
+          return;
+        }
+
+        showNotification('Tool deleted successfully', 'success');
+        tools = tools.filter(t => t.id !== name);
+        renderToolList();
+        currentTool = { name: '', description: '', category: '', implementation: '', parameters: [] };
+        renderTool(currentTool);
+      } catch (error) {
+        console.error('Delete error:', error);
+        showNotification('Error deleting tool: ' + error.message, 'error');
+      }
+    }
+
+    function exportTool() {
+      const name = document.getElementById('toolName').value || 'unnamed-tool';
+      const tool = {
+        name,
+        description: document.getElementById('toolDesc').value,
+        category: document.getElementById('toolCategory').value,
+        implementation: document.getElementById('toolImpl').value,
+        parameters: parameters
+      };
+
+      const json = JSON.stringify(tool, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}-tool.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showNotification('Tool exported', 'success');
+    }
+
+    function generateDocs() {
+      const name = document.getElementById('toolName').value || 'unnamed-tool';
+      const desc = document.getElementById('toolDesc').value || 'No description';
+
+      let paramDocs = '';
+      if (parameters.length > 0) {
+        paramDocs = '\n## Parameters\n\n' + parameters.map(p =>
+          `- **${p.name}** (${p.type}${p.required ? ', required' : ', optional'}): ${p.description || 'No description'}`
+        ).join('\n');
+      }
+
+      const exampleParams = parameters.reduce((acc, param) => {
+        acc[param.name] = param.default || (param.type === 'string' ? 'value' : param.type === 'number' ? 0 : null);
+        return acc;
+      }, {});
+
+      const docs = `# ${name} Tool
+
+${desc}
+${paramDocs}
+
+## Usage
+
+\`\`\`javascript
+const result = await __callHostTool__('${name}', ${JSON.stringify(exampleParams, null, 2)});
+console.log('Result:', result);
+\`\`\`
+
+## Implementation
+
+\`\`\`javascript
+${document.getElementById('toolImpl').value}
+\`\`\`
+`;
+
+      const blob = new Blob([docs], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${name}-README.md`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showNotification('Documentation generated', 'success');
+    }
+
+    function newTool() {
+      currentTool = null;
+      document.getElementById('toolName').value = 'new-tool';
+      document.getElementById('toolDesc').value = '';
+      document.getElementById('toolCategory').value = 'custom';
+      document.getElementById('toolImpl').value = 'async function executeTool(params) {\n  // Implementation\n  return { success: true };\n}';
+      document.getElementById('npmPackages').value = '';
+      document.getElementById('cdnUrls').value = '';
+      document.getElementById('esImports').value = '';
+      document.getElementById('importMap').value = '';
+
+      parameters = [];
+      renderParameters();
+      updateSchema();
+      updateImportPreview();
+
+      document.querySelectorAll('.tool-item').forEach(t => t.classList.remove('active'));
+      showNotification('New tool created', 'info');
     }
 
     function runTest() {
@@ -586,47 +858,15 @@ console.log('Query result:', result);</pre>
         try {
           const input = JSON.parse(document.getElementById('testInput').value);
           result.className = 'test-result success';
-          result.innerHTML = `✓ Success\n\nResult: {\n  "success": true,\n  "rows": [\n    { "id": 1, "name": "John Doe" }\n  ],\n  "count": 1\n}`;
+          result.textContent = `✓ Success\n\nTest validation passed. Input is valid JSON.\n\nNote: Actual execution requires backend integration.`;
         } catch (error) {
           result.className = 'test-result error';
           result.textContent = `✗ Error: ${error.message}`;
         }
-      }, 1000);
+      }, 500);
     }
 
-    function saveTool() {
-      currentTool.name = document.getElementById('toolName').value;
-      currentTool.description = document.getElementById('toolDesc').value;
-      currentTool.implementation = document.getElementById('toolImpl').value;
-      alert('Tool saved: ' + currentTool.name);
-    }
-
-    function exportTool() {
-      const json = JSON.stringify(currentTool, null, 2);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${currentTool.name}-tool.json`;
-      a.click();
-    }
-
-    function generateDocs() {
-      const docs = `# ${currentTool.name} Tool\n\n${currentTool.description}\n\n## Parameters\n\n- operation (string, required): Operation type\n- query (string, optional): SQL query\n\n## Usage\n\n\`\`\`javascript\nconst result = await __callHostTool__('${currentTool.name}', { operation: 'query' });\n\`\`\``;
-
-      const blob = new Blob([docs], { type: 'text/markdown' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${currentTool.name}-README.md`;
-      a.click();
-    }
-
-    function newTool() {
-      document.getElementById('toolName').value = 'new-tool';
-      document.getElementById('toolDesc').value = 'Description of your new tool';
-      document.getElementById('toolImpl').value = 'async function executeTool(params) {\n  // Implementation\n  return { success: true };\n}';
-    }
+    loadTools();
   </script>
 </body>
 </html>
