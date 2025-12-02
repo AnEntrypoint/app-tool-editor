@@ -378,6 +378,8 @@ import moment from 'moment';"></textarea>
           <h4 style="color: #4ade80; margin-bottom: 12px;">Generated Import Configuration</h4>
           <pre id="importPreview">Configure imports above to see preview</pre>
         </div>
+
+        <button class="primary" style="width: 100%; padding: 12px; margin-top: 20px;" onclick="validateImports()">✓ Validate Imports</button>
       </div>
       <div class="content" id="parametersTab" style="display: none;">
         <h3 style="color: #4ade80; margin-bottom: 16px;">Parameters</h3>
@@ -515,6 +517,13 @@ function createStorageManager(appId) {
       }
     }
 
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
     function renderToolList() {
       const list = document.getElementById('toolList');
       if (tools.length === 0) {
@@ -523,9 +532,9 @@ function createStorageManager(appId) {
       }
 
       list.innerHTML = tools.map((tool, idx) => `
-        <li class="tool-item ${idx === 0 ? 'active' : ''}" onclick="selectToolById('${tool.id}')" data-tool-id="${tool.id}">
-          <div class="tool-name">${tool.name || tool.id}</div>
-          <div class="tool-desc">${tool.description || 'No description'}</div>
+        <li class="tool-item ${idx === 0 ? 'active' : ''}" onclick="selectToolById('${escapeHtml(tool.id)}')" data-tool-id="${escapeHtml(tool.id)}">
+          <div class="tool-name">${escapeHtml(tool.name || tool.id)}</div>
+          <div class="tool-desc">${escapeHtml(tool.description || 'No description')}</div>
         </li>
       `).join('');
     }
@@ -594,12 +603,12 @@ function createStorageManager(appId) {
       list.innerHTML = parameters.map((param, idx) => `
         <div class="param-item">
           <div class="param-header">
-            <h4>${param.name}</h4>
+            <h4>${escapeHtml(param.name)}</h4>
             <button onclick="removeParameter(${idx})">Remove</button>
           </div>
           <div class="param-field">
             <label>Name</label>
-            <input type="text" value="${param.name}" onchange="updateParameter(${idx}, 'name', this.value)" />
+            <input type="text" value="${escapeHtml(param.name)}" onchange="updateParameter(${idx}, 'name', this.value)" />
           </div>
           <div class="param-field">
             <label>Type</label>
@@ -613,7 +622,7 @@ function createStorageManager(appId) {
           </div>
           <div class="param-field">
             <label>Description</label>
-            <input type="text" value="${param.description || ''}" onchange="updateParameter(${idx}, 'description', this.value)" />
+            <input type="text" value="${escapeHtml(param.description || '')}" onchange="updateParameter(${idx}, 'description', this.value)" />
           </div>
           <div class="param-field">
             <label>Required</label>
@@ -624,7 +633,7 @@ function createStorageManager(appId) {
           </div>
           <div class="param-field">
             <label>Default Value</label>
-            <input type="text" value="${param.default || ''}" onchange="updateParameter(${idx}, 'default', this.value)" placeholder="Leave empty for none" />
+            <input type="text" value="${escapeHtml(param.default || '')}" onchange="updateParameter(${idx}, 'default', this.value)" placeholder="Leave empty for none" />
           </div>
         </div>
       `).join('');
@@ -902,21 +911,73 @@ ${document.getElementById('toolImpl').value}
       showNotification('New tool created', 'info');
     }
 
-    function runTest() {
+    async function runTest() {
       const result = document.getElementById('testResult');
       result.className = 'test-result';
       result.textContent = 'Executing tool...';
 
-      setTimeout(() => {
+      try {
+        const testInputStr = document.getElementById('testInput').value;
+        let input = {};
         try {
-          const input = JSON.parse(document.getElementById('testInput').value);
-          result.className = 'test-result success';
-          result.textContent = `✓ Success\n\nTest validation passed. Input is valid JSON.\n\nNote: Actual execution requires backend integration.`;
-        } catch (error) {
+          input = JSON.parse(testInputStr);
+        } catch (e) {
           result.className = 'test-result error';
-          result.textContent = `✗ Error: ${error.message}`;
+          result.textContent = `✗ Invalid JSON: ${e.message}`;
+          return;
         }
-      }, 500);
+
+        const toolName = document.getElementById('toolName').value || 'unnamed-tool';
+        const implementation = document.getElementById('toolImpl').value;
+
+        const res = await fetch('/api/tools/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ toolName, implementation, input })
+        });
+
+        const execResult = await res.json();
+        if (execResult.success) {
+          result.className = 'test-result success';
+          result.textContent = `✓ Success (${execResult.duration}ms)\n\n${JSON.stringify(execResult.output, null, 2)}`;
+        } else {
+          result.className = 'test-result error';
+          result.textContent = `✗ Error:\n${execResult.error}\n\nStack:\n${execResult.stack || 'N/A'}`;
+        }
+      } catch (error) {
+        result.className = 'test-result error';
+        result.textContent = `✗ Execution error: ${error.message}`;
+      }
+    }
+
+    async function validateImports() {
+      const npmText = document.getElementById('npmPackages').value;
+      const packages = npmText ? npmText.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+      if (packages.length === 0) {
+        showNotification('No npm packages to validate', 'info');
+        return;
+      }
+
+      showNotification(`Validating ${packages.length} package(s)...`, 'info');
+
+      try {
+        const res = await fetch('/api/tools/validate-imports', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ packages })
+        });
+
+        const result = await res.json();
+        if (result.valid) {
+          showNotification(`✓ All ${packages.length} packages are valid`, 'success');
+        } else {
+          const invalid = result.invalid || [];
+          showNotification(`✗ Invalid packages: ${invalid.join(', ')}`, 'error');
+        }
+      } catch (error) {
+        showNotification(`Validation error: ${error.message}`, 'error');
+      }
     }
 
     loadTools();
