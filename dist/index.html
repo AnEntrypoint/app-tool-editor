@@ -504,7 +504,9 @@ function createStorageManager(appId) {
           showNotification('Failed to load tools', 'error');
           return;
         }
-        tools = await res.json();
+        const response = await res.json();
+        tools = (response.data && Array.isArray(response.data)) ? response.data : (response || []);
+        if (!Array.isArray(tools)) tools = [];
         renderToolList();
 
         if (tools.length > 0) {
@@ -981,6 +983,11 @@ ${document.getElementById('toolImpl').value}
     }
 
     loadTools();
+  </script>
+  <script src="/error-handler.js"></script>
+  <script>
+    const errorHandler = new ErrorHandler('app-tool-editor');
+    window.errorHandler = errorHandler;
   </script>
 </body>
 </html>
